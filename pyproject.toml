@@ -1,0 +1,66 @@
+# まだ未整理なので、開発終了後に整理すること
+# ビルドする前に絶対に！！！！！！！
+
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "watchedog-app"
+version = "0.1.0"
+description = "フォルダ監視アプリ"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [ { name = "Your Company", email = "dev-team@example.com" } ]
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3 :: Only",
+	"License :: Other/Proprietary License",
+]
+keywords = ["internal", "watch", "monitor"]
+
+dependencies = [
+	"watchdog>=2.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+	"black>=23.0",
+	"isort",
+	"mypy",
+	"flake8",
+	"pytest",
+]
+docs = ["sphinx", "sphinx-rtd-theme"]
+
+[project.scripts]
+watchedog = "watchedog_app.__main__:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["watchedog_app*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+python_version = 3.12
+strict = true
+files = ["src"]
+
+# Local, internal defaults for CI and developers
+[tool.coverage.run]
+branch = true
+source = ["watchedog_app"]
+
+
