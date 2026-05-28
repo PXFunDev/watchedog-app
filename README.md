@@ -35,6 +35,27 @@ python -m venv .venv
 source .venv/Scripts/activate
 pip install -U pip
 pip install watchfiles win11toast pystray pillow
+``` 
+
+## ビルド方法（Windows、PyInstaller）
+
+PyInstaller を使って onefile の単一実行ファイルを作成する手順例:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install pyinstaller
+# ワンファイル、コンソール非表示、クリーンビルド
+.\.venv\Scripts\python.exe -m PyInstaller --onefile --noconsole --name "フォルダ監視くん" --clean main.py
+```
+
+デバッグ用にコンソール出力を見たい場合は `--console` を指定してビルドしてください。
+
+ビルド成果物は `dist/フォルダ監視くん.exe` に作成されます。ビルド時の警告は `build/<name>/warn-<name>.txt` に出力されます。
+
+注意: `tkinter` は標準ライブラリですが、PyInstaller でバンドルする際に Tcl/Tk ランタイムが必要となる場合があります。問題が出た場合は PyInstaller の `--add-data` で tcl/tk リソースを明示的に追加してください。
+
 ```
 
 ## 起動方法

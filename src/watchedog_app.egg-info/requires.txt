@@ -1,0 +1,17 @@
+watchdog>=2.2.1
+pillow>=9.0.0
+pystray>=0.19.0
+win11toast>=0.36.3
+nuitka>=4.1.1
+
+[dev]
+black>=23.0
+flake8
+isort
+mypy
+pytest
+ruff>=0.15.14
+
+[docs]
+sphinx
+sphinx-rtd-theme

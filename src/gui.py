@@ -1,13 +1,19 @@
 import os
+import threading
 import tkinter as tk
 from tkinter import ttk, filedialog
-try:
-	from win11toast import toast as _toast_impl
-except Exception:
-	def _toast_impl(title, msg, duration="short"):
-		print(f"TOAST: {title} - {msg}")
 
-from typing import Any
+from typing import Any, Callable
+
+def _default_toast(title: str, msg: str, duration: str = "short") -> None:
+	print(f"TOAST: {title} - {msg}")
+
+_toast_impl: Callable[..., Any] = _default_toast
+try:
+	from win11toast import toast as _toast_impl  # type: ignore
+except Exception:
+	# keep default
+	pass
 
 def toast(title, msg, duration="short") -> None:
 	"""ラッパー: 実装の戻り値を破棄して常に None を返す。
@@ -45,10 +51,12 @@ class MinimalGUI:
 		self.root.withdraw()
 
 		username = os.environ.get("USERNAME", "user")
-		self.folder = fr"C:\\Users\\{username}\\.project\\TEST"
+		self.folder = rf"C:\Users\{username}"
 		self.target_name = '作業報告書'
 		self.target_ext = '.xlsx'
 		self.watcher = None
+ 		# 現在表示中の設定ウィンドウ参照（多重表示防止用）
+		self._settings_win = None
 
 		def _notify(title, msg):
 			self.root.after(0, toast, title, msg, "short")
@@ -74,20 +82,37 @@ class MinimalGUI:
 			toast('既に監視中です', '', duration="short")
 			print("[MinimalGUI] 既に監視中")
 
-	def stop_watching(self):
+	def stop_watching(self, wait: bool = True):
 		"""監視スレッドを停止する。
 
-		監視中であればスレッドに停止を指示して結合(join)します。
+		監視中であればスレッドに停止を指示します。
+		`wait=True`（デフォルト）の場合は終了まで待機して結合(join)します。
+		`wait=False` の場合は停止信号のみ送って即座に戻り、GUI をブロックしません。
 		"""
-		if self.watcher is not None and self.watcher.is_alive():
-			print("[MinimalGUI] 監視スレッド停止")
+		if self.watcher is None or not self.watcher.is_alive():
+			toast('監視は停止中です', '', duration="short")
+			print("[MinimalGUI] 監視は元々停止中")
+			return
+
+		print("[MinimalGUI] 監視スレッド停止" + ("(非同期)" if not wait else ""))
+		# 停止信号を送る
+		try:
 			self.watcher.stop()
-			self.watcher.join()
+		except Exception:
+			pass
+
+		if wait:
+			# 終了まで待って結合する（GUI 側で呼ぶとブロックするので注意）
+			try:
+				self.watcher.join()
+			except Exception:
+				pass
 			self.watcher = None
 			toast('監視を中断しました', '', duration="short")
 		else:
-			toast('監視は停止中です', '', duration="short")
-			print("[MinimalGUI] 監視は元々停止中")
+			# 非同期停止: watcher の参照は残しておく（別スレッドで停止処理が続行される）
+			pass
+
 
 	def show_settings(self):
 		"""設定ダイアログを表示し、監視対象やフィルタを編集する。
@@ -99,7 +124,21 @@ class MinimalGUI:
 			if folder_selected:
 				folder_var.set(folder_selected)
 
+		# 既に設定ウィンドウが開かれていればそれを最前面にする
+		if self._settings_win is not None and self._settings_win.winfo_exists():
+			try:
+				win = self._settings_win
+				win.deiconify()
+				win.lift()
+				win.attributes("-topmost", True)
+				win.after(100, lambda w=win: w.attributes("-topmost", False))
+				win.focus_force()
+			except Exception:
+				pass
+			return
+
 		setting_win = tk.Toplevel(self.root)
+		self._settings_win = setting_win
 		setting_win.title("設定")
 		setting_win.geometry("400x200")
 		setting_win.resizable(False, False)
@@ -132,20 +171,50 @@ class MinimalGUI:
 			self.folder = folder_var.get()
 			self.target_name = name_var.get()
 			self.target_ext = ext_var.get()
-			self.stop_watching()
-			self.start_watching()
+			# 監視の再起動は重い可能性があるため別スレッドで実行して GUI をブロックしない
+			def _restart():
+				try:
+					self.stop_watching(wait=True)
+				except Exception:
+					pass
+				try:
+					self.start_watching()
+				except Exception:
+					pass
+			threading.Thread(target=_restart, daemon=True).start()
 			message = f"新: {self.folder}\n{self.target_name}{self.target_ext}"
 			toast('設定を反映し再監視中', message, duration="short")
 			print("[MinimalGUI] 設定反映:", self.folder, self.target_name, self.target_ext)
+			# 閉じる前に参照をクリア
+			try:
+				self._settings_win = None
+			except Exception:
+				pass
 			setting_win.destroy()
 
 		button_frame = tk.Frame(setting_win)
 		button_frame.grid(row=3, column=0, columnspan=3, pady=15)
 		btn_ok = ttk.Button(button_frame, text="OK", command=apply_settings)
 		btn_ok.pack(side="left", padx=5)
-		btn_cancel = ttk.Button(button_frame, text="キャンセル", command=setting_win.destroy)
+		def _close_settings():
+			try:
+				self._settings_win = None
+			except Exception:
+				pass
+			setting_win.destroy()
+
+		btn_cancel = ttk.Button(button_frame, text="キャンセル", command=_close_settings)
 		btn_cancel.pack(side="left", padx=5)
 
+		# ウィンドウが閉じられたときに参照をクリア
+		def _on_close():
+			try:
+				self._settings_win = None
+			except Exception:
+				pass
+			setting_win.destroy()
+
+		setting_win.protocol("WM_DELETE_WINDOW", _on_close)
 		setting_win.grab_set()
 
 	def stop_and_exit(self):
