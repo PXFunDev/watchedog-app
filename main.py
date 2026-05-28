@@ -11,19 +11,29 @@ try:
 except Exception:
     Image = None
 
-# frozen 実行時は pystray を無効化して安全を優先
+# pystray の読み込み（frozen でも可能なら読み込む）
 try:
-    if not getattr(sys, "frozen", False):
-        import pystray
-    else:
-        pystray = None
+    import pystray
 except Exception:
     pystray = None
 
 def _locate_icon():
     """候補からアイコンのパスを返す。見つからなければ None を返す。"""
-    root = os.path.dirname(__file__)
+    # frozen 実行ファイルでは、可能なら PyInstaller の展開先（_MEIPASS）を優先
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            root = meipass
+        else:
+            # one-folder 形式や未展開の場合は実行ファイルのディレクトリ
+            root = os.path.dirname(sys.executable)
+    else:
+        root = os.path.dirname(__file__)
+
+    # 実行ファイル直下の assert フォルダを優先して探す
     candidates = [
+        os.path.join(root, "assert", "icon.ico"),
+        os.path.join(root, "assert", "icon.png"),
         os.path.join(root, "src", "assert", "icon.png"),
         os.path.join(root, "src", "icon", "icon.png"),
         os.path.join(root, "icon", "icon.png"),
@@ -44,7 +54,10 @@ def main():
         try:
             icon_image = Image.open(icon_path)
         except Exception:
-            icon_image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            try:
+                icon_image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            except Exception:
+                icon_image = None
 
     # pystray の有無とアイコンの有無で動作を決める（ローカル変数で扱う）
     pystray_impl = pystray if 'pystray' in globals() else None
