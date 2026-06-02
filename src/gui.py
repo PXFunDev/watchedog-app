@@ -137,6 +137,7 @@ class MinimalGUI:
 				pass
 			return
 
+		# 設定ウィンドウを新規作成する
 		setting_win = tk.Toplevel(self.root)
 		self._settings_win = setting_win
 		setting_win.title("設定")
@@ -147,6 +148,7 @@ class MinimalGUI:
 		name_var = tk.StringVar(value=self.target_name)
 		ext_var = tk.StringVar(value=self.target_ext)
 
+		# 監視対象フォルダ
 		lbl_folder = tk.Label(setting_win, text="監視対象フォルダ:")
 		lbl_folder.grid(row=0, column=0, sticky="w", padx=10, pady=10)
 		folder_entry = tk.Entry(setting_win, textvariable=folder_var, width=35)
@@ -154,6 +156,7 @@ class MinimalGUI:
 		folder_button = tk.Button(setting_win, text="参照", command=browse_folder)
 		folder_button.grid(row=0, column=2, padx=2)
 
+		# 監視対象のファイル名（部分一致）
 		lbl_name = tk.Label(
 			setting_win,
 			text="ファイル名(部分一致):",
@@ -162,6 +165,7 @@ class MinimalGUI:
 		name_entry = tk.Entry(setting_win, textvariable=name_var)
 		name_entry.grid(row=1, column=1, columnspan=2, padx=2, sticky="we")
 
+		# 監視対象の拡張子
 		lbl_ext = tk.Label(setting_win, text="拡張子:")
 		lbl_ext.grid(row=2, column=0, sticky="w", padx=10, pady=10)
 		ext_entry = tk.Entry(setting_win, textvariable=ext_var)

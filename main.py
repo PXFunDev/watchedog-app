@@ -2,6 +2,9 @@ import threading
 import os
 import sys
 
+import json
+
+
 # パッケージ参照用に src をパス先頭に追加
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 from src.gui import MinimalGUI
@@ -43,6 +46,12 @@ def _locate_icon():
             return p
     return None
 
+# 現在のディレクトリを取得
+def get_base_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable) # .exeとして実行
+    else:
+        return os.path.dirname(__file__)       # 通常スクリプト
 
 def main():
     """エントリポイント。GUI とシステムトレイを安全に起動する。"""
@@ -72,6 +81,15 @@ def main():
             print("pystray があるが PIL がないためトレイを無効化します")
             pystray_impl = None
 
+    # 設定ファイルの読み込み
+    config_path = os.path.join(get_base_dir(), "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        try:
+            config = json.load(f)
+        except Exception:
+            config = {}
+
+    # GUI を初期化する
     quit_event = threading.Event()
     gui = MinimalGUI(exit_callback=quit_event.set)
 
