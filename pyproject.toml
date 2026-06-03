@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "watchedog-app"
-version = "1.0.2"
+version = "1.1.0"
 description = "フォルダ監視アプリ"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,8 +20,10 @@ classifiers = [
 keywords = ["internal", "watch", "monitor"]
 
 dependencies = [
+	"nuitka>=4.1.2",
 	"pillow>=9.0.0",
 	"pystray>=0.19.0",
+	"ruff>=0.15.15",
 	"win11toast>=0.36.3",
 ]
 

@@ -3,7 +3,9 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog
 
-from typing import Any, Callable
+from typing import Any, Callable, Optional
+import json
+import sys
 
 def _default_toast(title: str, msg: str, duration: str = "short") -> None:
 	print(f"TOAST: {title} - {msg}")
@@ -66,6 +68,18 @@ class MinimalGUI:
 		self.root.protocol("WM_DELETE_WINDOW", self.stop_and_exit)
 		print("[MinimalGUI] 初期化: 監視対象", self.folder)
 
+	def _config_path(self) -> str:
+		"""設定ファイルのパスを返す。
+
+		frozen 実行時は実行ファイルのディレクトリ、通常はプロジェクトルート（src の親）を基準とする。
+		"""
+		if getattr(sys, "frozen", False):
+			base = os.path.dirname(sys.executable)
+		else:
+			# gui.py は src 配下にあるため、親ディレクトリをプロジェクトルートと見なす
+			base = os.path.dirname(os.path.dirname(__file__))
+		return os.path.join(base, "config.json")
+
 	def start_watching(self):
 		"""監視スレッドを開始する。
 
@@ -82,12 +96,16 @@ class MinimalGUI:
 			toast('既に監視中です', '', duration="short")
 			print("[MinimalGUI] 既に監視中")
 
-	def stop_watching(self, wait: bool = True):
+	def stop_watching(self, wait: bool = True, final_toast: Optional[str] = None):
 		"""監視スレッドを停止する。
 
 		監視中であればスレッドに停止を指示します。
 		`wait=True`（デフォルト）の場合は終了まで待機して結合(join)します。
 		`wait=False` の場合は停止信号のみ送って即座に戻り、GUI をブロックしません。
+
+		引数:
+		- wait: 終了まで待つかどうか
+		- final_toast: 終了時に表示するトーストのタイトル。None の場合は従来の文言を使う。
 		"""
 		if self.watcher is None or not self.watcher.is_alive():
 			toast('監視は停止中です', '', duration="short")
@@ -108,7 +126,11 @@ class MinimalGUI:
 			except Exception:
 				pass
 			self.watcher = None
-			toast('監視を中断しました', '', duration="short")
+			# 設定更新時など、カスタムメッセージがあればそれを表示する
+			if final_toast is None:
+				toast('監視を中断しました', '', duration="short")
+			else:
+				toast(final_toast, '', duration="short")
 		else:
 			# 非同期停止: watcher の参照は残しておく（別スレッドで停止処理が続行される）
 			pass
@@ -175,10 +197,25 @@ class MinimalGUI:
 			self.folder = folder_var.get()
 			self.target_name = name_var.get()
 			self.target_ext = ext_var.get()
+
+			# 設定を config.json に書き込む（失敗しても処理を続行）
+			try:
+				cfg = {
+					"watch_folder": self.folder,
+					"target_name": self.target_name,
+					"target_ext": self.target_ext,
+				}
+				with open(self._config_path(), "w", encoding="utf-8") as f:
+					json.dump(cfg, f, ensure_ascii=False, indent=4)
+			except Exception:
+				try:
+					print("[MinimalGUI] 設定ファイルへの保存に失敗しました")
+				except Exception:
+					pass
 			# 監視の再起動は重い可能性があるため別スレッドで実行して GUI をブロックしない
 			def _restart():
 				try:
-					self.stop_watching(wait=True)
+					self.stop_watching(wait=True, final_toast='設定を更新しました')
 				except Exception:
 					pass
 				try:

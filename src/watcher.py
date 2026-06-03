@@ -1,6 +1,8 @@
 import threading
 import os
 import time
+import json
+from typing import List, Callable, Dict
 
 
 class FolderWatcher(threading.Thread):
@@ -75,3 +77,64 @@ class FolderWatcher(threading.Thread):
         """監視の停止を要求する。スレッドは次回のループで終了します。"""
         self._stop_event.set()
         print("[FolderWatcher] 監視停止シグナル発行")
+
+
+def load_config(path: str) -> Dict:
+    """設定ファイルを読み込んで辞書で返す。存在しない場合は空辞書を返す。"""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def start_watchers_from_config(config_path: str, notifier: Callable[[str, str], None]) -> List[FolderWatcher]:
+    """設定ファイルから監視対象を読み込み、フォルダ監視スレッドを起動する。
+
+    サポートする設定キー:
+    - "watch_folder": 文字列または空文字列
+    - "watch_folders": 文字列のリスト
+    - "target_name": ファイル名の部分一致 (省略可)
+    - "target_ext": 拡張子 (省略可)
+    - "interval": ポーリング間隔（秒、省略可）
+
+    返り値: 起動した `FolderWatcher` オブジェクトのリスト
+    """
+    cfg = load_config(config_path)
+    target_name = cfg.get('target_name', '')
+    target_ext = cfg.get('target_ext', '')
+    interval = float(cfg.get('interval', 1.0))
+
+    folders = []
+    if 'watch_folders' in cfg and isinstance(cfg['watch_folders'], list):
+        folders = cfg['watch_folders']
+    else:
+        wf = cfg.get('watch_folder', '')
+        if wf:
+            folders = [wf]
+
+    watchers: List[FolderWatcher] = []
+    for folder in folders:
+        w = FolderWatcher(folder=folder, target_name=target_name, target_ext=target_ext, notifier=notifier, interval=interval)
+        w.daemon = True
+        w.start()
+        watchers.append(w)
+
+    return watchers
+
+
+if __name__ == '__main__':
+    # テスト用簡易実行。カレントディレクトリの ../src/config.json を読み込む
+    config_file = os.path.join(os.path.dirname(__file__), 'config.json')
+
+    def _print_notifier(title: str, message: str) -> None:
+        print(f"[NOTIFY] {title}: {message}")
+
+    ws = start_watchers_from_config(config_file, _print_notifier)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        for w in ws:
+            w.stop()
+        time.sleep(0.2)

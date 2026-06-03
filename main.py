@@ -1,7 +1,8 @@
+
+
 import threading
 import os
 import sys
-
 import json
 
 
@@ -33,11 +34,11 @@ def _locate_icon():
     else:
         root = os.path.dirname(__file__)
 
-    # 実行ファイル直下の assert フォルダを優先して探す
+    # 実行ファイル直下の assets フォルダを優先して探す
     candidates = [
-        os.path.join(root, "assert", "icon.ico"),
-        os.path.join(root, "assert", "icon.png"),
-        os.path.join(root, "src", "assert", "icon.png"),
+        os.path.join(root, "assets", "icon.ico"),
+        os.path.join(root, "assets", "icon.png"),
+        os.path.join(root, "src", "assets", "icon.png"),
         os.path.join(root, "src", "icon", "icon.png"),
         os.path.join(root, "icon", "icon.png"),
     ]
@@ -69,44 +70,67 @@ def main():
                 icon_image = None
 
     # pystray の有無とアイコンの有無で動作を決める（ローカル変数で扱う）
-    pystray_impl = pystray if 'pystray' in globals() else None
+    pystray_impl = pystray
     if pystray_impl is not None and icon_image is None:
         if Image is not None:
             try:
                 icon_image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
             except Exception:
-                print("pystray がアイコン作成に失敗したためトレイを無効化します")
+                print("[WARN] pystray がアイコン作成に失敗したためトレイを無効化します")
                 pystray_impl = None
         else:
-            print("pystray があるが PIL がないためトレイを無効化します")
+            print("[WARN] pystray があるが PIL がないためトレイを無効化します")
             pystray_impl = None
 
     # 設定ファイルの読み込み
     config_path = os.path.join(get_base_dir(), "config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        try:
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-        except Exception:
-            config = {}
+    except FileNotFoundError:
+        print("設定ファイルが見つかりませんでした。")
+        print("デフォルト設定で起動します。")
+        config = {}
+    except json.JSONDecodeError as e:
+        print(f"設定ファイルの読み込みに失敗しました: {e}. ")
+        print("デフォルト設定で起動します。")
+        config = {}
 
     # GUI を初期化する
     quit_event = threading.Event()
     gui = MinimalGUI(exit_callback=quit_event.set)
 
+    # 読み込んだ設定を GUI に反映する
+    if isinstance(config, dict):
+        # 複数フォルダ指定があれば先頭を採用
+        if 'watch_folders' in config and isinstance(config['watch_folders'], list) and config['watch_folders']:
+            gui.folder = config['watch_folders'][0]
+        else:
+            wf = config.get('watch_folder')
+            if wf:
+                gui.folder = wf
+
+        gui.target_name = config.get('target_name', gui.target_name)
+        gui.target_ext = config.get('target_ext', gui.target_ext)
+        try:
+            print("[main] 設定反映: ", gui.folder, gui.target_name, gui.target_ext)
+        except Exception as e:
+            print(f"[WARN] 設定の反映に失敗しました: {e}")
+
     def on_start(icon=None, item=None):
-        gui.start_watching()
+        gui.root.after(0, gui.start_watching)
 
     def on_stop(icon=None, item=None):
-        gui.stop_watching()
+        gui.root.after(0, gui.stop_watching)
 
     def on_exit(icon=None, item=None):
         try:
             if pystray_impl is not None and icon is not None:
                 icon.visible = False
                 icon.stop()
-        except Exception:
-            pass
-        gui.stop_and_exit()
+        except Exception as e:
+            print(f"[WARN] トレイアイコンの停止に失敗しました: {e}")
+        gui.root.after(0, gui.stop_and_exit)
 
     def on_settings(icon=None, item=None):
         gui.root.after(0, gui.show_settings)
@@ -114,7 +138,7 @@ def main():
     # pystray を使わない場合は GUI のみで起動
     if pystray_impl is None:
         print("pystray が無効 — トレイなしで起動します")
-        gui.start_watching()
+        gui.root.after(0, gui.start_watching)
         gui.root.mainloop()
         return
 
@@ -128,25 +152,25 @@ def main():
 
     try:
         tray_icon = pystray_impl.Icon("folderwatch", icon_image, "フォルダ見えるくん", menu)
-    except Exception:
-        print("トレイアイコンの初期化に失敗したためトレイを無効化します")
-        gui.start_watching()
+    except Exception as e:
+        print(f"[WARN] トレイアイコンの初期化に失敗したためトレイを無効化します: {e}")
+        gui.root.after(0, gui.start_watching)
         gui.root.mainloop()
         return
 
     # 起動時に自動で監視を開始する
     try:
-        gui.start_watching()
-    except Exception:
-        print("監視スレッドの起動に失敗しました")
+        gui.root.after(0, gui.start_watching)
+    except Exception as e:
+        print(f"[WARN] 監視スレッドの起動に失敗しました: {e}")
 
     # トレイスレッド
     def _tray_runner():
         try:
             tray_icon.run()
-        except Exception:
+        except Exception as e:
             # トレイ側の例外はログに出して無視
-            print("トレイスレッドで例外が発生しました")
+            print(f"[WARN] トレイスレッドで例外が発生しました: {e}")
 
     threading.Thread(target=_tray_runner, daemon=True).start()
 
@@ -155,8 +179,8 @@ def main():
     finally:
         try:
             tray_icon.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[WARN] トレイアイコンの停止に失敗しました: {e}")
 
 
 if __name__ == "__main__":
