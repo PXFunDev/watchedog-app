@@ -1,0 +1,93 @@
+Metadata-Version: 2.4
+Name: watchedog-app
+Version: 0.1.0
+Summary: フォルダ監視アプリ
+Author-email: Your Company <dev-team@example.com>
+License: Proprietary
+Keywords: internal,watch,monitor
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: License :: Other/Proprietary License
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: ruff>=0.15.14
+Requires-Dist: watchdog>=2.2.1
+Requires-Dist: pillow>=9.0.0
+Requires-Dist: pystray>=0.19.0
+Requires-Dist: win11toast>=0.36.3
+Provides-Extra: dev
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: sphinx-rtd-theme; extra == "docs"
+
+# フォルダ監視常駐アプリ (watchedog-app)
+
+軽量なフォルダ監視アプリケーション（社内利用）。
+指定フォルダに特定の名前・拡張子を持つファイルが追加されたときに、Windows のトースト通知およびタスクトレイ操作で監視を制御します。
+
+## **現状の仕様（要点）**
+
+- 監視エンジン: `watchfiles.watch` を用いた監視スレッド（`FolderWatcher`）
+- GUI: 最小構成の Tk をメインループで動かし、タスクトレイ操作で監視開始/停止/設定表示を行う（`MinimalGUI`）
+- 通知: `win11toast` を使ったトースト通知をメインスレッド経由で表示
+- タスクトレイ: `pystray` を使用し、開始/中断/設定/終了メニューを提供
+- デフォルト監視条件: ユーザーディレクトリ下の `.project/TEST`、ファイル名に「作業報告書」を含み拡張子 `.xlsx` を対象
+
+```planetext
+動作は `main.py` の `main()` で開始します。現在はアプリケーション全体が一つのスクリプトにまとまっています。
+```
+
+## 対応環境
+
+- OS: Windows（トースト通知は Windows 向け実装）
+- Python: >=3.12
+
+## 依存（実行に必要な主なパッケージ）
+
+- tkinter
+- watchfiles
+- win11toast
+- pystray
+- pillow (PIL)
+
+## インストール（開発環境）
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+pip install -U pip
+pip install watchfiles win11toast pystray pillow
+```
+
+## 起動方法
+
+- 開発中/手動実行: `python main.py`
+- GUI はタスクトレイで操作します（右クリックメニューから設定/開始/中断/終了）。
+
+## プロジェクト構成（主要ファイル）
+
+- `main.py` - 現在のエントリポイント。GUI と監視ロジックを含む。
+- `src/` - 配布用のパッケージ領域（`watchedog_app` モジュール等）
+- `pyproject.toml` - プロジェクト設定・ビルド設定（社内テンプレート）
+
+## 注意点
+
+- `src/watchedog_app` 以下はまだ最小実装です。配布用パッケージ化を行う場合は、`__main__` などエントリポイント実装を整備してください。
+- トースト通知やタスクトレイの動作は環境依存のため、テストは実機 Windows 上で行ってください。
+
+## 今後のタスク
+
+- `main` を `gui` とフォルダ監視（watcher）に分解する
+- `main` はエントリーポイントとしての役割だけを残す
+
+## 貢献方法
+
+- まずは `gui` と `watcher` の分割を行い、`src/watchedog_app` 以下にモジュール化してください。
+- 単体テスト（watcher の挙動）と CI の追加を推奨します。

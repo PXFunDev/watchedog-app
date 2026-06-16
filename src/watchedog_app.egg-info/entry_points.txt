@@ -1,0 +1,2 @@
+[console_scripts]
+watchedog = watchedog_app.__main__:main
