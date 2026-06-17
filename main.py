@@ -86,22 +86,20 @@ def save_config(config_data: dict):
 # アイコン関連
 # ===========================================
 
+def get_icon_path():
+    """アイコンファイルパス取得"""
+    return os.path.join(get_base_dir(), "src", "assert", "icon.png")
+
 def locate_icon_file():
-    """アイコンファイル検索"""
-    base_dir = get_base_dir()
+    """ビルド版かどうかでアイコンファイルの存在を確認してパスを返します。"""
+    icon_path = get_icon_path()
 
-    candidates = [
-        os.path.join(base_dir, "src", "assert", "icon.png"),
-        os.path.join(base_dir, "src", "icon", "icon.png"),
-        os.path.join(base_dir, "icon", "icon.png"),
-        os.path.join(base_dir, "icon.png"),
-    ]
-
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-
-    return None
+    if getattr(sys, 'frozen', False):
+        if os.path.exists(icon_path):
+            return icon_path
+        else:
+            print("ビルド版ですが、アイコンファイルが見つかりません:", icon_path)
+            return None
 
 def load_icon_image():
     """アイコン画像ロード"""
@@ -189,7 +187,7 @@ def _save_last_folder(gui, config):
     try:
         folder = gui.get_watch_folder()
         config["last_used_folder"] = folder
-        _save_config(config)
+        save_config(config)
     except Exception:
         pass
 

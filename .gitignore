@@ -1,0 +1,4 @@
+nuitka-crash-report.xml
+dist/
+.vdcode/
+.venv/
