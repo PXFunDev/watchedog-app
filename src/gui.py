@@ -33,10 +33,11 @@ class MinimalGUI:
 	"""
 	最小構成のTkウィンドウ。タスクトレイ操作からの監視制御と設定を提供します。
 	"""
-	def __init__(self, exit_callback):
+	def __init__(self, config, exit_callback):
 		"""GUI を初期化する。
 
 		引数:
+		- config: 設定データ
 		- exit_callback: アプリ終了時に呼び出されるコールバック関数。
 		"""
 		self.root = tk.Tk()
@@ -44,19 +45,20 @@ class MinimalGUI:
 		self.root.geometry("1x1+0+0")
 		self.root.withdraw()
 
-		username = os.environ.get("USERNAME", "user")
-		self.folder = fr"C:\\Users\\{username}\\.project\\TEST"
-		self.target_name = '作業報告書'
-		self.target_ext = '.xlsx'
+		username = os.environ.get("USERNAME", "")
+		self.target_folder = config.get("watch_folder", os.path.join("C:\\Users", username, "Downloads"))
+		self.target_name = config.get("target_name", "")
+		self.target_ext =  config.get("target_ext", "")
 		self.watcher = None
 
 		def _notify(title, msg):
+			"""通知を表示する。GUIスレッドで実行されるようにスケジュールする。"""
 			self.root.after(0, toast, title, msg, "short")
 
 		self.notifier = _notify
 		self.exit_callback = exit_callback
 		self.root.protocol("WM_DELETE_WINDOW", self.stop_and_exit)
-		print("[MinimalGUI] 初期化: 監視対象", self.folder)
+		print("[MinimalGUI] 初期化: 監視対象", self.target_folder)
 
 	def start_watching(self):
 		"""監視スレッドを開始する。
@@ -66,10 +68,10 @@ class MinimalGUI:
 		if self.watcher is None or not self.watcher.is_alive():
 			print("[MinimalGUI] 監視スレッド起動")
 			self.watcher = FolderWatcher(
-				self.folder, self.target_name, self.target_ext, self.notifier
+				self.target_folder, self.target_name, self.target_ext, self.notifier
 			)
 			self.watcher.start()
-			toast('監視を開始しました', self.folder, duration="short")
+			toast('監視を開始しました', self.target_folder, duration="short")
 		else:
 			toast('既に監視中です', '', duration="short")
 			print("[MinimalGUI] 既に監視中")
@@ -95,6 +97,7 @@ class MinimalGUI:
 		ユーザが設定を変更すると、監視を再起動して新設定を反映します。
 		"""
 		def browse_folder():
+			"""フォルダ選択ダイアログを開き、選択されたフォルダを設定に反映する。"""
 			folder_selected = filedialog.askdirectory()
 			if folder_selected:
 				folder_var.set(folder_selected)
@@ -104,7 +107,7 @@ class MinimalGUI:
 		setting_win.geometry("400x200")
 		setting_win.resizable(False, False)
 
-		folder_var = tk.StringVar(value=self.folder)
+		folder_var = tk.StringVar(value=self.target_folder)
 		name_var = tk.StringVar(value=self.target_name)
 		ext_var = tk.StringVar(value=self.target_ext)
 
@@ -129,14 +132,15 @@ class MinimalGUI:
 		ext_entry.grid(row=2, column=1, columnspan=2, padx=2, sticky="we")
 
 		def apply_settings():
-			self.folder = folder_var.get()
+			"""ユーザが設定を適用したときの処理。新しい設定を保存し、監視を再起動して反映させる。"""
+			self.target_folder = folder_var.get()
 			self.target_name = name_var.get()
 			self.target_ext = ext_var.get()
 			self.stop_watching()
 			self.start_watching()
-			message = f"新: {self.folder}\n{self.target_name}{self.target_ext}"
+			message = f"新: {self.target_folder}\n{self.target_name}{self.target_ext}"
 			toast('設定を反映し再監視中', message, duration="short")
-			print("[MinimalGUI] 設定反映:", self.folder, self.target_name, self.target_ext)
+			print("[MinimalGUI] 設定反映:", self.target_folder, self.target_name, self.target_ext)
 			setting_win.destroy()
 
 		button_frame = tk.Frame(setting_win)

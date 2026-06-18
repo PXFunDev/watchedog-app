@@ -1,3 +1,4 @@
+from pathlib import Path
 import threading
 import os
 import sys
@@ -20,13 +21,18 @@ except Exception:
 
 
 # ルートパスを取得
-def get_base_dir() -> str:
-    """ビルド版かどうかでベースディレクトリを返します。"""
+def get_base_dir() -> Path:
+    # exe（Nuitka / PyInstaller）
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    else:
-        # スクリプト実行の場合
-        return os.path.dirname(os.path.abspath(__file__))
+        return Path(sys.executable).resolve().parent
+
+    # __file__ が使える通常実行
+    if '__file__' in globals():
+        return Path(__file__).resolve().parent
+
+    # 最終フォールバック（VSCodeなど例外環境）
+    return Path.cwd()
+    
 
 # ===========================================
 # config関連
@@ -35,7 +41,10 @@ def get_base_dir() -> str:
 DEFAULT_CONFIG = {
     "watch_folder": "",
     "filename_keyword": "",
-    "extensions": [".xlsx"]
+    "extensions": [".xlsx"],
+    "target_name": "",
+    "target_ext": ".xlsx",
+    "last_used_folder": ""
 }
 
 def get_config_file_path() -> str:
@@ -62,6 +71,24 @@ def load_config() -> dict:
 
     # ③ キー補完
     updated = False
+
+    # 旧キーから新キーへの互換補完
+    if "target_name" not in config_data and "filename_keyword" in config_data:
+        config_data["target_name"] = config_data.get("filename_keyword", "")
+        updated = True
+
+    if "target_ext" not in config_data:
+        exts = config_data.get("extensions", [])
+        if isinstance(exts, list) and exts:
+            config_data["target_ext"] = exts[0]
+        else:
+            config_data["target_ext"] = DEFAULT_CONFIG["target_ext"]
+        updated = True
+
+    if "watch_folder" not in config_data and "last_used_folder" in config_data:
+        config_data["watch_folder"] = config_data.get("last_used_folder", "")
+        updated = True
+
     for key, value in DEFAULT_CONFIG.items():
         if key not in config_data:
             config_data[key] = value
@@ -88,18 +115,17 @@ def save_config(config_data: dict):
 
 def get_icon_path():
     """アイコンファイルパス取得"""
-    return os.path.join(get_base_dir(), "src", "assert", "icon.png")
+    return os.path.join(get_base_dir(), "src", "assets", "icon.png")
 
 def locate_icon_file():
     """ビルド版かどうかでアイコンファイルの存在を確認してパスを返します。"""
     icon_path = get_icon_path()
 
-    if getattr(sys, 'frozen', False):
-        if os.path.exists(icon_path):
-            return icon_path
-        else:
-            print("ビルド版ですが、アイコンファイルが見つかりません:", icon_path)
-            return None
+    if os.path.exists(icon_path):
+        return icon_path
+
+    print("アイコンファイルが見つかりません:", icon_path)
+    return None
 
 def load_icon_image():
     """アイコン画像ロード"""
@@ -119,10 +145,10 @@ def load_icon_image():
 # GUI関連
 # ===========================================
 
-def _create_gui():
+def _create_gui(config):
     """GUIを作成します"""
     quit_event = threading.Event()
-    return MinimalGUI(exit_callback=quit_event.set)
+    return MinimalGUI(config, exit_callback=quit_event.set)
 
 def _run_without_tray(gui, config):
     """pystrayがない場合の起動方法"""
@@ -167,6 +193,7 @@ def _create_tray(gui, config, icon_image):
                 icon.stop()
         except Exception:
             pass
+        _save_last_folder(gui, config)
         gui.stop_and_exit()
 
     def on_settings(icon=None, item=None):
@@ -183,27 +210,47 @@ def _create_tray(gui, config, icon_image):
     return pystray.Icon("folderwatch", icon_image, "フォルダ見えるくん", menu)
 
 def _save_last_folder(gui, config):
-    """最後に使用したフォルダを保存します"""
+    """GUIの現在設定を設定ファイルへ保存します"""
     try:
-        folder = gui.get_watch_folder()
+        folder = getattr(gui, "target_folder", "")
         config["last_used_folder"] = folder
+        config["watch_folder"] = folder
+
+        target_name = getattr(gui, "target_name", "")
+        target_ext = getattr(gui, "target_ext", "")
+        config["target_name"] = target_name
+        config["target_ext"] = target_ext
+
+        # 既存設定との互換性のため旧キーも更新
+        config["filename_keyword"] = target_name
+        config["extensions"] = [target_ext] if target_ext else []
+
         save_config(config)
     except Exception:
         pass
 
 def _restore_last_folder(gui, config):
-    """最後に使用したフォルダを復元します"""
-    if config.get("last_used_folder"):
-        try:
-            gui.set_watch_folder(config["last_used_folder"])
-        except Exception:
-            pass
+    """設定ファイルからGUIの監視条件を復元します"""
+    try:
+        folder = config.get("last_used_folder") or config.get("watch_folder", "")
+        if folder:
+            gui.target_folder = folder
+
+        gui.target_name = config.get("target_name", config.get("filename_keyword", ""))
+
+        if "target_ext" in config:
+            gui.target_ext = config.get("target_ext", "")
+        else:
+            exts = config.get("extensions", [])
+            gui.target_ext = exts[0] if isinstance(exts, list) and exts else ""
+    except Exception:
+        pass
 
 
 def main():
     config = load_config()              # 設定ファイル読み込み（自己修復付き）
     icon_image = load_icon_image()      # アイコン画像ロード
-    gui = _create_gui()                 # GUI作成
+    gui = _create_gui(config)           # GUI作成
 
     # 起動方法の選択
     if pystray is None:

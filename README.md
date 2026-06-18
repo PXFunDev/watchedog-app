@@ -64,8 +64,8 @@ uv run python -m nuitka `
   --follow-imports `
   --remove-output `
   --assume-yes-for-downloads `
-  --windows-icon-from-ico=src/assert/icon.ico `
-  --include-data-file=src/assert/icon.png=src/assert/icon.png `
+  --windows-icon-from-ico=src/assets/icon.ico `
+  --include-data-file=src/assets/icon.png=src/assets/icon.png `
   --output-dir=dist `
   --output-filename=フォルダ監視くん.exe
 ```
