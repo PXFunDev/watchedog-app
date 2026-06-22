@@ -2,3 +2,6 @@ nuitka-crash-report.xml
 dist/
 .vdcode/
 .venv/
+.log
+__pycache__/
+*.pyc

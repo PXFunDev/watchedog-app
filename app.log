@@ -1,0 +1,9 @@
+2026-06-19 14:21:51,946 - INFO - PIL (Pillow) が正常にインポートされました。
+2026-06-19 14:21:51,984 - INFO - pystray が正常にインポートされました。
+2026-06-19 14:21:51,984 - INFO - アプリ起動: BASE_DIR=C:\Users\7075685\.project\folder_watcher\watchedog-app
+2026-06-19 14:21:51,984 - INFO - 設定ファイルパス: C:\Users\7075685\.project\folder_watcher\watchedog-app\config.json
+2026-06-19 14:21:51,984 - INFO - アイコンファイルパス: C:\Users\7075685\.project\folder_watcher\watchedog-app\src\assets\icon.png
+2026-06-19 14:21:52,016 - INFO - 設定ファイル読み込み成功: C:\Users\7075685\.project\folder_watcher\watchedog-app\config.json
+2026-06-19 14:21:52,016 - INFO - アイコン読み込み成功: C:\Users\7075685\.project\folder_watcher\watchedog-app\src\assets\icon.png
+2026-06-19 14:23:10,575 - INFO - 設定ファイル保存成功: C:\Users\7075685\.project\folder_watcher\watchedog-app\config.json
+2026-06-19 14:23:21,788 - INFO - 設定ファイル保存成功: C:\Users\7075685\.project\folder_watcher\watchedog-app\config.json

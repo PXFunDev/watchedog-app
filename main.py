@@ -1,8 +1,23 @@
 from pathlib import Path
+import logging
 import threading
 import os
 import sys
+
 import json
+
+# 設定・ログなどの保管場所
+APPDATA_DIR = os.getenv("APPDATA") or os.path.expanduser("~/.config")
+APP_DIR = os.path.join(APPDATA_DIR, "WatchedogApp")
+os.makedirs(APP_DIR, exist_ok=True)
+
+# ログ設定
+logging.basicConfig(
+    filename=os.path.join(APP_DIR, "app.log"),
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    encoding="utf-8"
+)
 
 # `src` を `sys.path` の先頭に追加します。
 # main.py を直接実行したときに `watchedog_app` パッケージをインポート可能にします。
@@ -11,12 +26,16 @@ from src.gui import MinimalGUI
 
 try:
     from PIL import Image
-except Exception:
+    logging.info("PIL (Pillow) が正常にインポートされました。")
+except Exception as e:
+    logging.error(f"PIL (Pillow) のインポートエラー: {e}")
     Image = None
 
 try:
     import pystray
-except Exception:
+    logging.info("pystray が正常にインポートされました。")
+except Exception as e:
+    logging.error(f"pystray のインポートエラー: {e}")
     pystray = None
 
 
@@ -32,7 +51,9 @@ def get_base_dir() -> Path:
 
     # 最終フォールバック（VSCodeなど例外環境）
     return Path.cwd()
-    
+
+BASE_DIR = get_base_dir()
+logging.info(f"アプリ起動: BASE_DIR={BASE_DIR}")
 
 # ===========================================
 # config関連
@@ -40,62 +61,49 @@ def get_base_dir() -> Path:
 
 DEFAULT_CONFIG = {
     "watch_folder": "",
-    "filename_keyword": "",
-    "extensions": [".xlsx"],
-    "target_name": "",
-    "target_ext": ".xlsx",
-    "last_used_folder": ""
+    "target_name": "作業報告書",
+    "target_ext": ".xlsx"
 }
 
 def get_config_file_path() -> str:
     """設定ファイルパス取得"""
-    return os.path.join(get_base_dir(), "config.json")
+    return os.path.join(APP_DIR, "config.json")
+
+CONFIG_FILE_PATH = get_config_file_path()
+logging.info(f"設定ファイルパス: {CONFIG_FILE_PATH}")
 
 
 def load_config() -> dict:
     """設定ファイル読み込み（自己修復付き）"""
-    config_path = get_config_file_path()
 
     # ① なければ作成
-    if not os.path.exists(config_path):
+    if not os.path.exists(CONFIG_FILE_PATH):
         save_config(DEFAULT_CONFIG)
+        logging.info(f"設定ファイルが存在しないため作成: {CONFIG_FILE_PATH}")
         return DEFAULT_CONFIG.copy()
 
     # ② 読み込み
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             config_data = json.load(f)
-    except Exception:
+        logging.info(f"設定ファイル読み込み成功: {CONFIG_FILE_PATH}")
+    except Exception as e:
+        logging.error(f"設定ファイル読み込みエラー: {e}")
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG.copy()
 
     # ③ キー補完
     updated = False
 
-    # 旧キーから新キーへの互換補完
-    if "target_name" not in config_data and "filename_keyword" in config_data:
-        config_data["target_name"] = config_data.get("filename_keyword", "")
-        updated = True
-
-    if "target_ext" not in config_data:
-        exts = config_data.get("extensions", [])
-        if isinstance(exts, list) and exts:
-            config_data["target_ext"] = exts[0]
-        else:
-            config_data["target_ext"] = DEFAULT_CONFIG["target_ext"]
-        updated = True
-
-    if "watch_folder" not in config_data and "last_used_folder" in config_data:
-        config_data["watch_folder"] = config_data.get("last_used_folder", "")
-        updated = True
-
     for key, value in DEFAULT_CONFIG.items():
         if key not in config_data:
             config_data[key] = value
+            logging.info(f"設定ファイル補完: '{key}' をデフォルト値から取得")
             updated = True
 
     if updated:
         save_config(config_data)
+        logging.info("設定ファイルを補完後に保存しました。")
 
     return config_data
 
@@ -106,8 +114,10 @@ def save_config(config_data: dict):
     try:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4, ensure_ascii=False)
+            logging.info(f"設定ファイル保存成功: {config_path}")
     except Exception as e:
         print(f"設定ファイル保存エラー: {e}")
+        logging.error(f"設定ファイル保存エラー: {e}")
 
 # ===========================================
 # アイコン関連
@@ -115,7 +125,10 @@ def save_config(config_data: dict):
 
 def get_icon_path():
     """アイコンファイルパス取得"""
-    return os.path.join(get_base_dir(), "src", "assets", "icon.png")
+    return os.path.join(BASE_DIR, "src", "assets", "icon.png")
+
+ICON_FILE_PATH = get_icon_path()
+logging.info(f"アイコンファイルパス: {ICON_FILE_PATH}")
 
 def locate_icon_file():
     """ビルド版かどうかでアイコンファイルの存在を確認してパスを返します。"""
@@ -125,6 +138,7 @@ def locate_icon_file():
         return icon_path
 
     print("アイコンファイルが見つかりません:", icon_path)
+    logging.error(f"アイコンファイルが見つかりません: {icon_path}")
     return None
 
 def load_icon_image():
@@ -134,9 +148,12 @@ def load_icon_image():
 
     if Image is not None and icon_path:
         try:
+            logging.info(f"アイコン読み込み成功: {icon_path}")
             return Image.open(icon_path)
+
         except Exception as e:
             print("アイコン読み込み失敗:", e)
+            logging.error(f"アイコン読み込み失敗: {e}")
 
     return Image.new("RGBA", (64, 64), (0, 0, 0, 0))
 
@@ -213,7 +230,6 @@ def _save_last_folder(gui, config):
     """GUIの現在設定を設定ファイルへ保存します"""
     try:
         folder = getattr(gui, "target_folder", "")
-        config["last_used_folder"] = folder
         config["watch_folder"] = folder
 
         target_name = getattr(gui, "target_name", "")
@@ -221,9 +237,10 @@ def _save_last_folder(gui, config):
         config["target_name"] = target_name
         config["target_ext"] = target_ext
 
-        # 既存設定との互換性のため旧キーも更新
-        config["filename_keyword"] = target_name
-        config["extensions"] = [target_ext] if target_ext else []
+        # 既存設定との互換性のため、旧キーが既にある場合のみ更新
+        if "filename_keyword" in config or "extensions" in config:
+            config["filename_keyword"] = target_name
+            config["extensions"] = [target_ext] if target_ext else []
 
         save_config(config)
     except Exception:
@@ -232,7 +249,7 @@ def _save_last_folder(gui, config):
 def _restore_last_folder(gui, config):
     """設定ファイルからGUIの監視条件を復元します"""
     try:
-        folder = config.get("last_used_folder") or config.get("watch_folder", "")
+        folder = config.get("watch_folder", "")
         if folder:
             gui.target_folder = folder
 
