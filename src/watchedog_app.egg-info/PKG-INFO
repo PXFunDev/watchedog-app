@@ -1,0 +1,95 @@
+Metadata-Version: 2.4
+Name: watchedog-app
+Version: 1.1.0
+Summary: フォルダ監視アプリ
+Author-email: Shoji Hirano <hirano.shoji@jp.panasonic.com>
+License: Proprietary
+Keywords: internal,watch,monitor
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: License :: Other/Proprietary License
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: nuitka>=4.1.2
+Requires-Dist: pillow>=9.0.0
+Requires-Dist: pystray>=0.19.0
+Requires-Dist: ruff>=0.15.15
+Requires-Dist: win11toast>=0.36.3
+Provides-Extra: dev
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff>=0.15.14; extra == "dev"
+Provides-Extra: build
+Requires-Dist: pyinstaller>=6.0; extra == "build"
+Provides-Extra: docs
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: sphinx-rtd-theme; extra == "docs"
+
+# フォルダ監視常駐アプリ (watchedog-app)
+
+軽量なフォルダ監視アプリケーション（社内利用）。指定フォルダに特定の名前・拡張子を持つファイルが追加されたときに、Windows のトースト通知およびタスクトレイ操作で監視を制御します。
+
+## 現状（実装の要点）
+
+- **監視エンジン**: `src/watcher.py` の `FolderWatcher` は外部依存を避けるためのポーリング走査実装です（短い間隔でディレクトリを走査して新規ファイルを検出します）。
+- **GUI**: `src/gui.py` の `MinimalGUI`（Tk）でタスクトレイ操作や設定ダイアログを提供します。
+- **通知**: `win11toast`（存在する場合）経由でトースト通知を表示します（フォールバックでコンソール出力）。
+- **設定永続化**: 設定ダイアログで「OK」を押すと `config.json` に保存され、次回起動や即時反映に利用されます。
+
+デフォルト監視条件はユーザーディレクトリ（起動時に `MinimalGUI` がデフォルト値を設定）で、ファイル名に「作業報告書」を含み拡張子 `.xlsx` を対象としています。
+
+## 設定ファイル (`config.json`)
+
+- 既定のパス: プロジェクトルートの `config.json`（`src/gui.py` と `main.py` が読み書きします）。
+- サポートされるキー:
+	- `watch_folder`: 監視対象フォルダ（文字列）
+	- `watch_folders`: 監視対象フォルダの配列（複数指定の先頭を起動時に使用）
+	- `target_name`: ファイル名の部分一致（例: "作業報告書"）
+	- `target_ext`: 拡張子（例: ".xlsx"）
+
+例:
+
+```json
+{
+		"watch_folders": ["C:/path/to/dir"],
+		"target_name": "作業報告書",
+		"target_ext": ".xlsx",
+}
+```
+
+## 起動・操作
+
+- 開発中/手動実行: `python main.py`
+- 起動時に `main.py` が `config.json` を読み込み、読み込んだ設定を `MinimalGUI` に反映します。GUI の設定ダイアログで編集して「OK」を押すと `config.json` に保存され、監視は再起動されます（完了トーストは「設定を更新しました」になります）。
+
+## 依存（主なパッケージ）
+
+- tkinter（標準）
+- win11toast（Windows トースト通知用、無くてもフォールバックあり）
+- pystray（タスクトレイ用、環境により無効化されることがあります）
+- pillow (PIL)（アイコン処理）
+
+注: 監視自体は外部 `watchfiles` に依存しないポーリング実装です。
+
+## ビルド（PyInstaller 例）
+
+PyInstaller を使って onefile の単一実行ファイルを作成する手順例:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install pyinstaller
+# ワンファイル、コンソール非表示、クリーンビルド
+.\.venv\Scripts\python.exe -m PyInstaller --onefile --noconsole --name "フォルダ監視くん" --clean main.py
+```
+
+## 開発上の注意
+
+- `main.py` は起動時に `config.json` を読み込み `MinimalGUI` に反映します。GUI の設定変更は `config.json` に保存され、即時監視設定に反映されます。
+- トースト通知やタスクトレイの動作は環境依存のため、実機 Windows 上での動作確認を推奨します。

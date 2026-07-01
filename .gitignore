@@ -1,0 +1,77 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenv
+.venv/
+venv/
+ENV/
+env/
+``
+# Distribution / build
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+
+# PyInstaller warnings and build artifacts
+build/*/warn-*.txt
+
+# PyInstaller runtime
+*.manifest
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.lock
+uv.lock
+
+# Test / cache
+.pytest_cache/
+.coverage
+.cache
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+# Virtual environments
+.venv/
+.venv-build/
+venv/
+env/
+
+# PyInstaller / build artifacts
+build/
+dist/
+*.spec
+*.exe
+
+# Editor / IDE
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# egg-info
+*.egg-info/
+src/watchedog_app.egg-info/
+
+# logs
+*.log
